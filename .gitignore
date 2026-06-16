@@ -1,0 +1,27 @@
+﻿# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Environment
+.env
+
+# Temp files
+_update_*.py
+_check_*.py
+_test_*.py
+_parse_*.py
+_import_*.py
+_fix*.py
+data/docx_content.txt
+
+# OS
+Thumbs.db
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
