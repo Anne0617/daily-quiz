@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>第{{ day_seq }}天 · 星河十五五规划自测</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="container" id="app">
+    <div class="header">
+        <h1>📖 星河十五五规划</h1>
+        <div class="day-badge">第 {{ day_seq }} 天</div>
+    </div>
+
+    <div class="section knowledge-section">
+        <h2>📚 今日知识点</h2>
+        <ol class="knowledge-list">
+            {% for kp in knowledge_points %}
+            <li>{{ kp }}</li>
+            {% endfor %}
+        </ol>
+    </div>
+
+    <div class="section quiz-section" id="quiz-section">
+        <h2>📝 今日自测</h2>
+        <p class="hint">请完成以下 5 道选择题，点击提交查看成绩</p>
+        <div id="questions">
+            {% for q in questions %}
+            <div class="question-card" data-seq="{{ q.seq }}">
+                <div class="q-header"><span class="q-number">第{{ q.seq }}题</span></div>
+                <p class="q-text">{{ q.text }}</p>
+                <div class="options">
+                    {% for key, value in q.options.items() %}
+                    <label class="option-item">
+                        <input type="radio" name="q{{ q.seq }}" value="{{ key }}">
+                        <span class="option-label"><span class="option-key">{{ key }}</span>. {{ value }}</span>
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="user-info">
+            <input type="text" id="user-name" placeholder="请输入您的真实姓名" autocomplete="name">
+            <input type="text" id="user-dept" placeholder="部门（选填）" autocomplete="organization">
+        </div>
+        <button class="btn-submit" id="btn-submit" onclick="submitQuiz()">提交答案</button>
+    </div>
+
+    <div class="section result-section" id="result-section" style="display:none;">
+        <h2>📊 答题结果</h2>
+        <div class="score-display">
+            <span class="score-num" id="score-num">0</span>
+            <span class="score-divider">/</span>
+            <span class="score-total" id="score-total">5</span>
+        </div>
+        <div class="result-details" id="result-details"></div>
+    </div>
+</div>
+<footer><p>学习强企 · 星河十五五规划 · 每日一练</p></footer>
+
+<script>
+let submitted = false;
+
+async function submitQuiz() {
+    if (submitted) return;
+    const name = document.getElementById("user-name").value.trim();
+    if (!name) { alert("请填写您的真实姓名"); return; }
+
+    const answers = [];
+    for (let i = 1; i <= 5; i++) {
+        const selected = document.querySelector(`input[name="q${i}"]:checked`);
+        if (!selected) { alert(`请完成第 ${i} 题`); return; }
+        answers.push(selected.value);
+    }
+
+    submitted = true;
+    const btn = document.getElementById("btn-submit");
+    btn.disabled = true;
+    btn.textContent = "提交中...";
+
+    try {
+        const resp = await fetch("/api/submit", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({
+                name: name,
+                department: document.getElementById("user-dept").value.trim(),
+                day_seq: {{ day_seq }},
+                answers: answers
+            })
+        });
+        if (!resp.ok) {
+            const err = await resp.json();
+            alert(err.detail || "提交失败，请重试");
+            submitted = false; btn.disabled = false; btn.textContent = "提交答案";
+            return;
+        }
+        const result = await resp.json();
+        showResult(result);
+    } catch (e) {
+        alert("网络错误，请重试");
+        submitted = false; btn.disabled = false; btn.textContent = "提交答案";
+    }
+}
+
+function showResult(result) {
+    document.getElementById("quiz-section").style.display = "none";
+    document.getElementById("result-section").style.display = "block";
+    document.getElementById("score-num").textContent = result.score;
+    document.getElementById("score-total").textContent = result.total;
+
+    const detailsDiv = document.getElementById("result-details");
+    detailsDiv.innerHTML = "";
+    result.details.forEach((d) => {
+        const card = document.createElement("div");
+        card.className = "result-card " + (d.is_correct ? "correct" : "wrong");
+        const optsText = Object.entries(d.options).map(([k, v]) => `${k}. ${v}`).join("  ");
+        let html = `
+            <div class="result-q-header">
+                <span class="result-q-num">第${d.seq}题</span>
+                <span class="result-badge ${d.is_correct ? "correct" : "wrong"}">${d.is_correct ? "✓ 正确" : "✗ 错误"}</span>
+            </div>
+            <p class="result-q-text">${d.text}</p>
+            <div class="result-opts">${optsText}</div>
+            <div class="result-answer">
+                <span class="answer-label">你的答案:</span>
+                <span class="answer-value ${d.is_correct ? "correct" : "wrong"}">${d.selected}</span>
+                ${!d.is_correct ? `<span class="answer-label"> 正确答案:</span> <span class="answer-value correct">${d.correct_answer}</span>` : ""}
+            </div>`;
+        if (d.explanation) {
+            html += `<div class="result-explanation">💡 ${d.explanation}</div>`;
+        }
+        card.innerHTML = html;
+        detailsDiv.appendChild(card);
+    });
+    document.getElementById("result-section").scrollIntoView({ behavior: "smooth" });
+}
+</script>
+</body>
+</html>
